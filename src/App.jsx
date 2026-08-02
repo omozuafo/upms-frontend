@@ -34,6 +34,7 @@ const LandlordForm = lazy(() => import("./pages/LandlordForm"));
 const Messages = lazy(() => import("./pages/Messages"));
 const MessageForm = lazy(() => import("./pages/MessageForm"));
 const MessageDetail = lazy(() => import("./pages/MessageDetail"));
+const Expenses = lazy(() => import("./pages/Expenses"));
 const Layout = lazy(() => import("./components/Layout"));
 
 // Loading fallback component
@@ -77,6 +78,7 @@ function App() {
 
               <Route path="/payments" element={<Payments />} />
               <Route path="/payments/new" element={<PaymentForm />} />
+              <Route path="/expenses" element={<Expenses />} />
               <Route path="/audit-trail" element={<AuditTrail />} />
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/maintenance/new" element={<MaintenanceForm />} />
