@@ -595,14 +595,14 @@ export default function Payments() {
                             .endsWith(".pdf") ? (
                             <div>
                               <embed
-                                src={`http://localhost:8000/${selectedPayment.evidence_path}`}
+                                src={`${(import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com/api").replace(/\/api\/?$/, "")}/${selectedPayment.evidence_path}`}
                                 type="application/pdf"
                                 width="100%"
                                 height="400px"
                               />
                               <div className="mt-2">
                                 <a
-                                  href={`http://localhost:8000/${selectedPayment.evidence_path}`}
+                                  href={`${(import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com/api").replace(/\/api\/?$/, "")}/${selectedPayment.evidence_path}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="btn btn-sm btn-outline-primary"
@@ -614,7 +614,7 @@ export default function Payments() {
                             </div>
                           ) : (
                             <img
-                              src={`http://localhost:8000/${selectedPayment.evidence_path}`}
+                              src={`${(import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com/api").replace(/\/api\/?$/, "")}/${selectedPayment.evidence_path}`}
                               alt="Payment Evidence"
                               className="img-fluid"
                               style={{ maxHeight: "400px" }}
