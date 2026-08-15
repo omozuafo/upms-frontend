@@ -1,15 +1,63 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Component } from "react";
 import useRealtime from "../hooks/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import { useRefresh } from "../contexts/RefreshContext";
 import { toast } from "react-toastify";
 
-export default function Expenses() {
+// Local Error Boundary to catch any render errors and prevent blank screens
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Expenses ErrorBoundary caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-vh-100 p-5 bg-light d-flex align-items-center justify-content-center">
+          <div className="card border-0 shadow text-center p-4" style={{ maxWidth: "500px" }}>
+            <div className="text-danger mb-3">
+              <i className="bi bi-exclamation-triangle-fill fs-1"></i>
+            </div>
+            <h4 className="fw-bold text-dark mb-2">Something went wrong</h4>
+            <p className="text-muted small mb-4">
+              An error occurred while loading the Expenses portal: {this.state.error?.message || "Unknown error"}
+            </p>
+            <div className="d-flex justify-content-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="btn btn-primary"
+              >
+                <i className="bi bi-arrow-clockwise me-2"></i> Reload Page
+              </button>
+              <a href="/dashboard" className="btn btn-outline-secondary">
+                Go to Dashboard
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function ExpensesContent() {
   const [expenses, setExpenses] = useState([]);
   const [properties, setProperties] = useState([]);
   const { triggerRefresh } = useRefresh();
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -28,8 +76,7 @@ export default function Expenses() {
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
 
-  // Form State matching specification:
-  // receipt_number, expense purpose, account_name, account_number, amount_paid, timestamp, description
+  // Form State
   const [formData, setFormData] = useState({
     receipt_number: "",
     purpose: "",
@@ -78,10 +125,15 @@ export default function Expenses() {
   const fetchExpenses = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
+      setFetchError(null);
       const response = await api.get("/expenses");
-      setExpenses(response.data);
+      setExpenses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
+      setExpenses([]);
+      if (isInitial) {
+        setFetchError(error.response?.data?.message || "Failed to fetch expenses from server");
+      }
     } finally {
       if (isInitial) setLoading(false);
     }
@@ -90,12 +142,14 @@ export default function Expenses() {
   const fetchProperties = async () => {
     try {
       const response = await api.get("/properties");
-      setProperties(response.data);
-      if (response.data.length > 0 && !formData.property_id) {
-        setFormData((prev) => ({ ...prev, property_id: response.data[0].id }));
+      const props = Array.isArray(response.data) ? response.data : [];
+      setProperties(props);
+      if (props.length > 0 && !formData.property_id) {
+        setFormData((prev) => ({ ...prev, property_id: props[0].id }));
       }
     } catch (error) {
       console.error("Failed to fetch properties:", error);
+      setProperties([]);
     }
   };
 
@@ -135,21 +189,30 @@ export default function Expenses() {
     checkRoleAndFetch();
   }, [fetchExpenses, navigate]);
 
+  // Safe Realtime Subscriptions
   useRealtime("expense", {
     onCreated: (newExpense) => {
+      if (!newExpense || !newExpense.id) return;
       setExpenses((prev) => {
-        if (prev.find((e) => e.id === newExpense.id)) return prev;
-        return [newExpense, ...prev];
+        const safePrev = Array.isArray(prev) ? prev : [];
+        if (safePrev.find((e) => e.id === newExpense.id)) return safePrev;
+        return [newExpense, ...safePrev];
       });
       fetchExpenses(false);
     },
     onUpdated: (updatedExpense) => {
-      setExpenses((prev) =>
-        prev.map((e) => (e.id === updatedExpense.id ? { ...e, ...updatedExpense } : e))
-      );
+      if (!updatedExpense || !updatedExpense.id) return;
+      setExpenses((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        return safePrev.map((e) => (e.id === updatedExpense.id ? { ...e, ...updatedExpense } : e));
+      });
     },
     onDeleted: (deletedData) => {
-      setExpenses((prev) => prev.filter((e) => e.id !== deletedData.id));
+      if (!deletedData || !deletedData.id) return;
+      setExpenses((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        return safePrev.filter((e) => e.id !== deletedData.id);
+      });
     },
   });
 
@@ -271,7 +334,8 @@ export default function Expenses() {
     if (!window.confirm("Are you sure you want to delete this expense claim?")) return;
     try {
       await api.delete(`/expenses/${id}`);
-      setExpenses(expenses.filter((e) => e.id !== id));
+      const safePrev = Array.isArray(expenses) ? expenses : [];
+      setExpenses(safePrev.filter((e) => e.id !== id));
       triggerRefresh();
       toast.success("Expense deleted successfully");
     } catch (error) {
@@ -333,7 +397,12 @@ export default function Expenses() {
     }
   };
 
-  const displayedExpenses = expenses.filter((e) => {
+  // Defensive array checks
+  const safeExpensesList = Array.isArray(expenses) ? expenses : [];
+  const safePropertiesList = Array.isArray(properties) ? properties : [];
+
+  const displayedExpenses = safeExpensesList.filter((e) => {
+    if (!e) return false;
     if (filters.propertyId !== "All" && String(e.property_id) !== String(filters.propertyId)) return false;
     if (filters.category !== "All" && e.category !== filters.category) return false;
     if (filters.status !== "All" && e.status !== filters.status) return false;
@@ -359,10 +428,10 @@ export default function Expenses() {
       }
     }
 
-    if (filters.dateFrom) {
+    if (filters.dateFrom && e.date) {
       if (new Date(e.date) < new Date(filters.dateFrom)) return false;
     }
-    if (filters.dateTo) {
+    if (filters.dateTo && e.date) {
       const toDate = new Date(filters.dateTo);
       toDate.setHours(23, 59, 59, 999);
       if (new Date(e.date) > toDate) return false;
@@ -372,17 +441,35 @@ export default function Expenses() {
   });
 
   const stats = {
-    total: expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
-    pendingCount: expenses.filter((e) => e.status === "Pending").length,
-    approvedCount: expenses.filter((e) => e.status === "Approved" || e.status === "Paid").length,
-    rejectedCount: expenses.filter((e) => e.status === "Rejected").length,
+    total: safeExpensesList.reduce((sum, e) => sum + parseFloat(e?.amount || 0), 0),
+    pendingCount: safeExpensesList.filter((e) => e?.status === "Pending").length,
+    approvedCount: safeExpensesList.filter((e) => e?.status === "Approved" || e?.status === "Paid").length,
+    rejectedCount: safeExpensesList.filter((e) => e?.status === "Rejected").length,
   };
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center min-vh-100">
-        <div className="spinner-border text-primary" role="status">
+      <div className="d-flex flex-column justify-content-center align-items-center min-vh-100 bg-light">
+        <div className="spinner-border text-primary mb-3" role="status" style={{ width: "3rem", height: "3rem" }}>
           <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="text-muted fw-semibold mb-0">Loading Expenses Portal...</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-vh-100 p-5 bg-light d-flex align-items-center justify-content-center">
+        <div className="card border-0 shadow text-center p-4" style={{ maxWidth: "500px" }}>
+          <div className="text-warning mb-3">
+            <i className="bi bi-exclamation-triangle fs-1"></i>
+          </div>
+          <h5 className="fw-bold text-dark mb-2">Unable to Load Expenses</h5>
+          <p className="text-muted small mb-4">{fetchError}</p>
+          <button onClick={() => fetchExpenses(true)} className="btn btn-primary">
+            <i className="bi bi-arrow-clockwise me-2"></i> Try Again
+          </button>
         </div>
       </div>
     );
@@ -491,7 +578,7 @@ export default function Expenses() {
                 onChange={(e) => setFilters({ ...filters, propertyId: e.target.value })}
               >
                 <option value="All">All Properties</option>
-                {properties.map((p) => (
+                {safePropertiesList.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -587,12 +674,14 @@ export default function Expenses() {
                       )}
                     </td>
                     <td className="fw-bold text-danger">
-                      ₦{Number(expense.amount).toLocaleString()}
+                      ₦{Number(expense.amount || 0).toLocaleString()}
                     </td>
                     <td>
                       {expense.payment_timestamp
                         ? new Date(expense.payment_timestamp).toLocaleString()
-                        : new Date(expense.date).toLocaleDateString()}
+                        : expense.date
+                        ? new Date(expense.date).toLocaleDateString()
+                        : "N/A"}
                     </td>
                     <td>
                       <span className={`badge ${getStatusBadgeClass(expense.status)} px-2 py-1`}>
@@ -610,7 +699,6 @@ export default function Expenses() {
                       )}
                     </td>
                     <td className="pe-4 text-end">
-                      {/* Admin Approve & Reject Buttons */}
                       {isAdmin && expense.status === "Pending" && (
                         <div className="btn-group btn-group-sm me-2">
                           <button
@@ -672,7 +760,6 @@ export default function Expenses() {
               <form onSubmit={handleSubmitToAdmin}>
                 <div className="modal-body p-4">
                   <div className="row g-3">
-                    {/* Receipt Number */}
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">Receipt Number *</label>
                       <input
@@ -686,7 +773,6 @@ export default function Expenses() {
                       />
                     </div>
 
-                    {/* Property */}
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">Property *</label>
                       <select
@@ -699,7 +785,7 @@ export default function Expenses() {
                         <option value="" disabled>
                           Select Property
                         </option>
-                        {properties.map((p) => (
+                        {safePropertiesList.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
@@ -707,7 +793,6 @@ export default function Expenses() {
                       </select>
                     </div>
 
-                    {/* Expense Purpose */}
                     <div className="col-md-12">
                       <label className="form-label fw-semibold">Expense Purpose *</label>
                       <input
@@ -716,12 +801,11 @@ export default function Expenses() {
                         name="purpose"
                         value={formData.purpose}
                         onChange={handleInputChange}
-                        placeholder="e.g. Repair generator, Purchase office supplies, Plumbing service..."
+                        placeholder="e.g. Repair generator, Purchase office supplies..."
                         required
                       />
                     </div>
 
-                    {/* Account Paid To Section */}
                     <div className="col-12">
                       <div className="p-3 bg-light rounded border">
                         <h6 className="fw-bold mb-3 text-secondary">Account Paid To</h6>
@@ -782,7 +866,6 @@ export default function Expenses() {
                       </div>
                     </div>
 
-                    {/* Description */}
                     <div className="col-md-12">
                       <label className="form-label fw-semibold">Description</label>
                       <textarea
@@ -797,7 +880,6 @@ export default function Expenses() {
                   </div>
                 </div>
 
-                {/* Form Buttons as requested: Cancel and To Admin */}
                 <div className="modal-footer bg-light d-flex justify-content-between">
                   <button
                     type="button"
@@ -839,7 +921,7 @@ export default function Expenses() {
                     <strong>
                       {rejectingExpense.receipt_number || `#${rejectingExpense.id}`}
                     </strong>{" "}
-                    (₦{Number(rejectingExpense.amount).toLocaleString()}).
+                    (₦{Number(rejectingExpense.amount || 0).toLocaleString()}).
                   </p>
                   <div className="mb-3">
                     <label className="form-label fw-semibold text-danger">
@@ -853,9 +935,6 @@ export default function Expenses() {
                       placeholder="Explain to the accounting staff why this expense was rejected..."
                       required
                     ></textarea>
-                    <small className="text-muted mt-1 d-block">
-                      This description will be sent as a notification to the accounting staff.
-                    </small>
                   </div>
                 </div>
                 <div className="modal-footer bg-light">
@@ -872,14 +951,7 @@ export default function Expenses() {
                     className="btn btn-danger"
                     disabled={rejectSubmitting}
                   >
-                    {rejectSubmitting ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2"></span>
-                        Rejecting...
-                      </>
-                    ) : (
-                      "Confirm Rejection"
-                    )}
+                    {rejectSubmitting ? "Rejecting..." : "Confirm Rejection"}
                   </button>
                 </div>
               </form>
@@ -888,5 +960,13 @@ export default function Expenses() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Expenses() {
+  return (
+    <ErrorBoundary>
+      <ExpensesContent />
+    </ErrorBoundary>
   );
 }
