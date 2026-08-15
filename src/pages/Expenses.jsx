@@ -100,15 +100,39 @@ export default function Expenses() {
   };
 
   useEffect(() => {
-    const role = sessionStorage.getItem("role");
-    const allowedRoles = ["super_admin", "admin", "accounting_staff"];
-    if (!allowedRoles.includes(role)) {
-      navigate("/dashboard");
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
       return;
     }
 
-    fetchExpenses(true);
-    fetchProperties();
+    const checkRoleAndFetch = async () => {
+      let role = sessionStorage.getItem("role");
+      if (!role) {
+        try {
+          const res = await api.post("/auth/me");
+          role = res.data?.role;
+          if (role) {
+            sessionStorage.setItem("role", role);
+          }
+        } catch (e) {
+          console.error("Failed to verify user session:", e);
+          navigate("/login");
+          return;
+        }
+      }
+
+      const allowedRoles = ["super_admin", "admin", "accounting_staff"];
+      if (!allowedRoles.includes(role)) {
+        navigate("/dashboard");
+        return;
+      }
+
+      await fetchExpenses(true);
+      await fetchProperties();
+    };
+
+    checkRoleAndFetch();
   }, [fetchExpenses, navigate]);
 
   useRealtime("expense", {

@@ -29,12 +29,22 @@ export default function Layout() {
   };
 
   useEffect(() => {
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
     const fetchUser = async () => {
       try {
         const response = await api.post("/auth/me");
         setUser(response.data);
+        if (response.data && response.data.role) {
+          sessionStorage.setItem("role", response.data.role);
+        }
       } catch (error) {
         console.error("Failed to fetch user:", error);
+        navigate("/login");
       }
     };
 
@@ -47,7 +57,7 @@ export default function Layout() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [navigate]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("token");
