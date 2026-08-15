@@ -3,6 +3,7 @@ import useRealtime from "../hooks/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import { useRefresh } from "../contexts/RefreshContext";
+import { toast } from "react-toastify";
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
@@ -11,6 +12,9 @@ export default function Expenses() {
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const userRole = sessionStorage.getItem("role") || "";
+  const isAdmin = ["super_admin", "admin"].includes(userRole);
 
   const [filters, setFilters] = useState({
     propertyId: "All",
@@ -23,16 +27,29 @@ export default function Expenses() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+
+  // Form State matching specification:
+  // receipt_number, expense purpose, account_name, account_number, amount_paid, timestamp, description
   const [formData, setFormData] = useState({
+    receipt_number: "",
+    purpose: "",
+    account_name: "",
+    account_number: "",
+    amount: "",
+    payment_timestamp: new Date().toISOString().slice(0, 16),
+    date: new Date().toISOString().split("T")[0],
     property_id: "",
     category: "Maintenance",
-    amount: "",
-    date: "",
     vendor: "",
     invoice_number: "",
-    status: "Pending",
     description: "",
   });
+
+  // Rejection Modal State
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectingExpense, setRejectingExpense] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const categories = [
     "Maintenance",
@@ -47,7 +64,7 @@ export default function Expenses() {
     "Miscellaneous",
   ];
 
-  const statuses = ["Pending", "Approved", "Paid", "Rejected"];
+  const statuses = ["Pending", "Approved", "Rejected", "Paid"];
 
   const formatCompact = (val) => {
     const num = Number(val || 0);
@@ -115,13 +132,17 @@ export default function Expenses() {
   const handleOpenAdd = () => {
     setEditingExpense(null);
     setFormData({
+      receipt_number: `RCP-${Math.floor(100000 + Math.random() * 900000)}`,
+      purpose: "",
+      account_name: "",
+      account_number: "",
+      amount: "",
+      payment_timestamp: new Date().toISOString().slice(0, 16),
+      date: new Date().toISOString().split("T")[0],
       property_id: properties[0]?.id || "",
       category: "Maintenance",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
       vendor: "",
       invoice_number: "",
-      status: "Pending",
       description: "",
     });
     setShowModal(true);
@@ -130,13 +151,19 @@ export default function Expenses() {
   const handleOpenEdit = (expense) => {
     setEditingExpense(expense);
     setFormData({
+      receipt_number: expense.receipt_number || "",
+      purpose: expense.purpose || expense.category || "",
+      account_name: expense.account_name || "",
+      account_number: expense.account_number || "",
+      amount: expense.amount || "",
+      payment_timestamp: expense.payment_timestamp
+        ? new Date(expense.payment_timestamp).toISOString().slice(0, 16)
+        : new Date().toISOString().slice(0, 16),
+      date: expense.date ? expense.date.split("T")[0] : new Date().toISOString().split("T")[0],
       property_id: expense.property_id || "",
       category: expense.category || "Maintenance",
-      amount: expense.amount || "",
-      date: expense.date ? expense.date.split("T")[0] : "",
       vendor: expense.vendor || "",
       invoice_number: expense.invoice_number || "",
-      status: expense.status || "Pending",
       description: expense.description || "",
     });
     setShowModal(true);
@@ -144,66 +171,120 @@ export default function Expenses() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  // Submit to Admin
+  const handleSubmitToAdmin = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...formData,
+        status: "Pending", // Always sent as Pending to Admin
+      };
+
       if (editingExpense) {
-        await api.put(`/expenses/${editingExpense.id}`, formData);
-        alert("Expense updated successfully");
+        await api.put(`/expenses/${editingExpense.id}`, payload);
+        toast.success("Expense request updated and sent to Admin.");
       } else {
-        await api.post("/expenses", formData);
-        alert("Expense created successfully");
+        await api.post("/expenses", payload);
+        toast.success("Expense form submitted to Admin for approval.");
       }
       setShowModal(false);
       fetchExpenses(false);
       triggerRefresh();
     } catch (error) {
       console.error("Failed to save expense:", error);
-      alert(error.response?.data?.message || "Failed to save expense");
+      toast.error(error.response?.data?.message || "Failed to submit expense request");
+    }
+  };
+
+  // Admin Approve Action
+  const handleApprove = async (id) => {
+    try {
+      await api.post(`/expenses/${id}/approve`);
+      toast.success("Expense approved! Notification sent to accounting staff.");
+      fetchExpenses(false);
+      triggerRefresh();
+    } catch (error) {
+      console.error("Failed to approve expense:", error);
+      toast.error(error.response?.data?.message || "Failed to approve expense");
+    }
+  };
+
+  // Admin Reject Action Trigger
+  const handleOpenRejectModal = (expense) => {
+    setRejectingExpense(expense);
+    setRejectionReason("");
+    setShowRejectModal(true);
+  };
+
+  const handleConfirmReject = async (e) => {
+    e.preventDefault();
+    if (!rejectionReason.trim()) {
+      toast.error("Please provide a description for the rejection.");
+      return;
+    }
+    setRejectSubmitting(true);
+    try {
+      await api.post(`/expenses/${rejectingExpense.id}/reject`, {
+        rejection_reason: rejectionReason.trim(),
+      });
+      toast.info("Expense rejected with notification sent to accounting staff.");
+      setShowRejectModal(false);
+      setRejectingExpense(null);
+      fetchExpenses(false);
+      triggerRefresh();
+    } catch (error) {
+      console.error("Failed to reject expense:", error);
+      toast.error(error.response?.data?.message || "Failed to reject expense");
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this expense?")) return;
+    if (!window.confirm("Are you sure you want to delete this expense claim?")) return;
     try {
       await api.delete(`/expenses/${id}`);
       setExpenses(expenses.filter((e) => e.id !== id));
       triggerRefresh();
-      alert("Expense deleted successfully");
+      toast.success("Expense deleted successfully");
     } catch (error) {
       console.error("Failed to delete expense:", error);
-      alert("Failed to delete expense");
+      toast.error("Failed to delete expense");
     }
   };
 
   const handleExportCSV = () => {
     const headers = [
+      "Receipt No.",
+      "Purpose",
       "Property",
-      "Category",
+      "Account Name",
+      "Account Number",
       "Amount",
-      "Date",
-      "Vendor",
-      "Invoice Number",
+      "Date Paid",
       "Status",
-      "Description",
+      "Rejection Reason",
     ];
     const rows = displayedExpenses.map((expense) => [
+      expense.receipt_number || "-",
+      expense.purpose || expense.category,
       expense.property?.name || "-",
-      expense.category,
+      expense.account_name || "-",
+      expense.account_number || "-",
       `₦${parseFloat(expense.amount || 0).toLocaleString()}`,
-      new Date(expense.date).toLocaleDateString(),
-      expense.vendor || "-",
-      expense.invoice_number || "-",
+      expense.payment_timestamp
+        ? new Date(expense.payment_timestamp).toLocaleString()
+        : new Date(expense.date).toLocaleDateString(),
       expense.status,
-      expense.description || "-",
+      expense.rejection_reason || "-",
     ]);
 
     const csvContent = [
       headers.join(","),
-      ...rows.map((row) => row.join(",")),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -217,9 +298,8 @@ export default function Expenses() {
   const getStatusBadgeClass = (status) => {
     switch (status) {
       case "Paid":
-        return "bg-success";
       case "Approved":
-        return "bg-info";
+        return "bg-success";
       case "Pending":
         return "bg-warning text-dark";
       case "Rejected":
@@ -236,15 +316,19 @@ export default function Expenses() {
 
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
-      const vendorName = e.vendor?.toLowerCase() || "";
+      const receipt = e.receipt_number?.toLowerCase() || "";
+      const purpose = e.purpose?.toLowerCase() || "";
+      const accName = e.account_name?.toLowerCase() || "";
+      const accNum = e.account_number?.toLowerCase() || "";
       const category = e.category?.toLowerCase() || "";
-      const invoice = e.invoice_number?.toLowerCase() || "";
       const propName = e.property?.name?.toLowerCase() || "";
 
       if (
-        !vendorName.includes(searchTerm) &&
+        !receipt.includes(searchTerm) &&
+        !purpose.includes(searchTerm) &&
+        !accName.includes(searchTerm) &&
+        !accNum.includes(searchTerm) &&
         !category.includes(searchTerm) &&
-        !invoice.includes(searchTerm) &&
         !propName.includes(searchTerm)
       ) {
         return false;
@@ -263,21 +347,11 @@ export default function Expenses() {
     return true;
   });
 
-  // Calculate statistics
   const stats = {
     total: expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
-    maintenance: expenses
-      .filter((e) => e.category === "Maintenance")
-      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
-    utilities: expenses
-      .filter((e) => e.category === "Utilities")
-      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
-    payroll: expenses
-      .filter((e) => e.category === "Salary / Payroll")
-      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
-    misc: expenses
-      .filter((e) => e.category === "Miscellaneous")
-      .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0),
+    pendingCount: expenses.filter((e) => e.status === "Pending").length,
+    approvedCount: expenses.filter((e) => e.status === "Approved" || e.status === "Paid").length,
+    rejectedCount: expenses.filter((e) => e.status === "Rejected").length,
   };
 
   if (loading) {
@@ -293,10 +367,12 @@ export default function Expenses() {
   return (
     <div className="min-vh-100 p-4 bg-light">
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
-          <h1 className="h3 fw-bold text-dark mb-1">Expenses</h1>
-          <p className="text-muted mb-0">Manage property expenses, utility bills, and maintenance costs</p>
+          <h1 className="h3 fw-bold text-dark mb-1">Expenses & Approvals</h1>
+          <p className="text-muted mb-0">
+            Submit expense forms for Admin review, manage accounts paid to, and track approval status.
+          </p>
         </div>
         <div className="d-flex gap-2">
           <button onClick={handleExportCSV} className="btn btn-outline-secondary">
@@ -305,34 +381,65 @@ export default function Expenses() {
           </button>
           <button onClick={handleOpenAdd} className="btn btn-primary">
             <i className="bi bi-plus-lg me-2"></i>
-            Record Expense
+            Fill Expense Form
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="row g-3 mb-4">
-        {[
-          { name: "Total Expenses", total: stats.total, color: "danger", icon: "bi-graph-down-arrow" },
-          { name: "Maintenance", total: stats.maintenance, color: "primary", icon: "bi-tools" },
-          { name: "Utilities", total: stats.utilities, color: "warning", icon: "bi-lightning" },
-          { name: "Salary & Payroll", total: stats.payroll, color: "success", icon: "bi-people" },
-          { name: "Miscellaneous", total: stats.misc, color: "secondary", icon: "bi-cash-stack" },
-        ].map((type) => (
-          <div key={type.name} className="col-md-6 col-lg">
-            <div className="payment-stat-card">
-              <div className="d-flex justify-content-between align-items-start">
-                <div className="flex-grow-1">
-                  <p className="payment-stat-label">{type.name}</p>
-                  <h3 className="payment-stat-value">₦{formatCompact(type.total)}</h3>
-                </div>
-                <div className={`payment-stat-icon payment-stat-icon-${type.color}`}>
-                  <i className={`bi ${type.icon}`}></i>
-                </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <p className="text-muted small mb-1">Total Expenses</p>
+                <h4 className="fw-bold mb-0 text-dark">₦{formatCompact(stats.total)}</h4>
+              </div>
+              <div className="bg-primary-subtle text-primary p-3 rounded-circle">
+                <i className="bi bi-cash-coin fs-4"></i>
               </div>
             </div>
           </div>
-        ))}
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <p className="text-muted small mb-1">Pending Approval</p>
+                <h4 className="fw-bold mb-0 text-warning">{stats.pendingCount}</h4>
+              </div>
+              <div className="bg-warning-subtle text-warning p-3 rounded-circle">
+                <i className="bi bi-hourglass-split fs-4"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <p className="text-muted small mb-1">Approved Claims</p>
+                <h4 className="fw-bold mb-0 text-success">{stats.approvedCount}</h4>
+              </div>
+              <div className="bg-success-subtle text-success p-3 rounded-circle">
+                <i className="bi bi-check-circle fs-4"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="card border-0 shadow-sm p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <p className="text-muted small mb-1">Rejected Claims</p>
+                <h4 className="fw-bold mb-0 text-danger">{stats.rejectedCount}</h4>
+              </div>
+              <div className="bg-danger-subtle text-danger p-3 rounded-circle">
+                <i className="bi bi-x-circle fs-4"></i>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters Form */}
@@ -347,13 +454,13 @@ export default function Expenses() {
                 <input
                   type="text"
                   className="form-control border-start-0 bg-light"
-                  placeholder="Search vendor, invoice..."
+                  placeholder="Receipt #, Purpose, Account..."
                   value={filters.search}
                   onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 />
               </div>
             </div>
-            <div className="col-6 col-md-2">
+            <div className="col-6 col-md-3">
               <select
                 className="form-select bg-light border-0"
                 value={filters.propertyId}
@@ -367,21 +474,7 @@ export default function Expenses() {
                 ))}
               </select>
             </div>
-            <div className="col-6 col-md-2">
-              <select
-                className="form-select bg-light border-0"
-                value={filters.category}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-              >
-                <option value="All">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-6 col-md-2">
+            <div className="col-6 col-md-3">
               <select
                 className="form-select bg-light border-0"
                 value={filters.status}
@@ -419,15 +512,15 @@ export default function Expenses() {
       {/* Expenses Table */}
       <div className="card border-0 shadow-sm p-0">
         <div className="table-responsive">
-          <table className="table table-hover mb-0">
-            <thead className="payment-table-header">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="table-light">
               <tr>
-                <th className="ps-4">Invoice No.</th>
+                <th className="ps-4">Receipt No.</th>
+                <th>Expense Purpose</th>
                 <th>Property</th>
-                <th>Category</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>Vendor</th>
+                <th>Account Paid To</th>
+                <th>Amount Paid</th>
+                <th>Timestamp / Date</th>
                 <th>Status</th>
                 <th className="pe-4 text-end">Actions</th>
               </tr>
@@ -437,27 +530,85 @@ export default function Expenses() {
                 <tr>
                   <td colSpan="8" className="text-center py-5 text-muted">
                     <i className="bi bi-inbox fs-1 d-block mb-2"></i>
-                    No expenses found
+                    No expense claims found
                   </td>
                 </tr>
               ) : (
                 displayedExpenses.map((expense) => (
                   <tr key={expense.id}>
-                    <td className="ps-4 fw-medium text-secondary">{expense.invoice_number || "N/A"}</td>
+                    <td className="ps-4 fw-medium text-dark">
+                      {expense.receipt_number || expense.invoice_number || "N/A"}
+                    </td>
+                    <td>
+                      <span className="fw-semibold text-dark">
+                        {expense.purpose || expense.category}
+                      </span>
+                      {expense.description && (
+                        <small className="d-block text-muted text-truncate" style={{ maxWidth: "200px" }}>
+                          {expense.description}
+                        </small>
+                      )}
+                    </td>
                     <td>{expense.property?.name || "N/A"}</td>
                     <td>
-                      <span className="payment-type-badge">{expense.category}</span>
+                      {expense.account_name || expense.account_number ? (
+                        <div>
+                          <span className="d-block text-dark fw-medium">
+                            {expense.account_name || "Account"}
+                          </span>
+                          <small className="text-muted">{expense.account_number}</small>
+                        </div>
+                      ) : (
+                        <span className="text-muted">N/A</span>
+                      )}
                     </td>
-                    <td className="fw-semibold text-danger">₦{Number(expense.amount).toLocaleString()}</td>
-                    <td>{new Date(expense.date).toLocaleDateString()}</td>
-                    <td>{expense.vendor || "N/A"}</td>
+                    <td className="fw-bold text-danger">
+                      ₦{Number(expense.amount).toLocaleString()}
+                    </td>
                     <td>
-                      <span className={`badge ${getStatusBadgeClass(expense.status)}`}>{expense.status}</span>
+                      {expense.payment_timestamp
+                        ? new Date(expense.payment_timestamp).toLocaleString()
+                        : new Date(expense.date).toLocaleDateString()}
+                    </td>
+                    <td>
+                      <span className={`badge ${getStatusBadgeClass(expense.status)} px-2 py-1`}>
+                        {expense.status}
+                      </span>
+                      {expense.status === "Rejected" && expense.rejection_reason && (
+                        <div
+                          className="text-danger small mt-1"
+                          style={{ maxWidth: "180px", fontSize: "0.75rem" }}
+                          title={expense.rejection_reason}
+                        >
+                          <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                          {expense.rejection_reason}
+                        </div>
+                      )}
                     </td>
                     <td className="pe-4 text-end">
+                      {/* Admin Approve & Reject Buttons */}
+                      {isAdmin && expense.status === "Pending" && (
+                        <div className="btn-group btn-group-sm me-2">
+                          <button
+                            onClick={() => handleApprove(expense.id)}
+                            className="btn btn-sm btn-success text-white"
+                            title="Approve Expense"
+                          >
+                            <i className="bi bi-check-lg me-1"></i> Approve
+                          </button>
+                          <button
+                            onClick={() => handleOpenRejectModal(expense)}
+                            className="btn btn-sm btn-danger text-white"
+                            title="Reject Expense"
+                          >
+                            <i className="bi bi-x-lg me-1"></i> Reject
+                          </button>
+                        </div>
+                      )}
+
                       <button
                         onClick={() => handleOpenEdit(expense)}
-                        className="btn btn-sm btn-outline-secondary me-2"
+                        className="btn btn-sm btn-outline-secondary me-1"
                       >
                         Edit
                       </button>
@@ -476,20 +627,44 @@ export default function Expenses() {
         </div>
       </div>
 
-      {/* Record / Edit Expense Modal */}
+      {/* Record / Edit Expense Form Modal */}
       {showModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{editingExpense ? "Edit Expense" : "Record Expense"}</h5>
-                <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}
+        >
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header bg-light">
+                <h5 className="modal-title fw-bold">
+                  {editingExpense ? "Edit Expense Claim" : "Expense Form (Submit to Admin)"}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowModal(false)}
+                ></button>
               </div>
-              <form onSubmit={handleSubmit}>
-                <div className="modal-body">
+              <form onSubmit={handleSubmitToAdmin}>
+                <div className="modal-body p-4">
                   <div className="row g-3">
-                    <div className="col-md-12">
-                      <label className="form-label">Property *</label>
+                    {/* Receipt Number */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Receipt Number *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="receipt_number"
+                        value={formData.receipt_number}
+                        onChange={handleInputChange}
+                        placeholder="e.g. RCP-89401"
+                        required
+                      />
+                    </div>
+
+                    {/* Property */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Property *</label>
                       <select
                         className="form-select"
                         name="property_id"
@@ -508,108 +683,179 @@ export default function Expenses() {
                       </select>
                     </div>
 
-                    <div className="col-md-6">
-                      <label className="form-label">Category *</label>
-                      <select
-                        className="form-select"
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        required
-                      >
-                        {categories.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Amount (₦) *</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="amount"
-                        value={formData.amount}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Date *</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        name="date"
-                        value={formData.date}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Status *</label>
-                      <select
-                        className="form-select"
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                        required
-                      >
-                        {statuses.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Vendor</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="vendor"
-                        value={formData.vendor}
-                        onChange={handleInputChange}
-                        placeholder="Vendor name"
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Invoice Number</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="invoice_number"
-                        value={formData.invoice_number}
-                        placeholder="INV-XXXXX"
-                        onChange={handleInputChange}
-                      />
-                    </div>
-
+                    {/* Expense Purpose */}
                     <div className="col-md-12">
-                      <label className="form-label">Description</label>
+                      <label className="form-label fw-semibold">Expense Purpose *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="purpose"
+                        value={formData.purpose}
+                        onChange={handleInputChange}
+                        placeholder="e.g. Repair generator, Purchase office supplies, Plumbing service..."
+                        required
+                      />
+                    </div>
+
+                    {/* Account Paid To Section */}
+                    <div className="col-12">
+                      <div className="p-3 bg-light rounded border">
+                        <h6 className="fw-bold mb-3 text-secondary">Account Paid To</h6>
+                        <div className="row g-3">
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold">Account Name *</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="account_name"
+                              value={formData.account_name}
+                              onChange={handleInputChange}
+                              placeholder="e.g. Zenith Bank / John Doe Services"
+                              required
+                            />
+                          </div>
+
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold">Account Number *</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="account_number"
+                              value={formData.account_number}
+                              onChange={handleInputChange}
+                              placeholder="e.g. 0123456789"
+                              required
+                            />
+                          </div>
+
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold">Amount Paid (₦) *</label>
+                            <input
+                              type="number"
+                              className="form-control"
+                              name="amount"
+                              value={formData.amount}
+                              onChange={handleInputChange}
+                              placeholder="0.00"
+                              min="0"
+                              step="any"
+                              required
+                            />
+                          </div>
+
+                          <div className="col-md-6">
+                            <label className="form-label small fw-semibold">Timestamp / Date Paid *</label>
+                            <input
+                              type="datetime-local"
+                              className="form-control"
+                              name="payment_timestamp"
+                              value={formData.payment_timestamp}
+                              onChange={handleInputChange}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="col-md-12">
+                      <label className="form-label fw-semibold">Description</label>
                       <textarea
                         className="form-control"
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
                         rows="3"
-                        placeholder="Describe the expense details..."
+                        placeholder="Detailed explanation of the expense..."
                       ></textarea>
                     </div>
                   </div>
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+
+                {/* Form Buttons as requested: Cancel and To Admin */}
+                <div className="modal-footer bg-light d-flex justify-content-between">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary px-4"
+                    onClick={() => setShowModal(false)}
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    {editingExpense ? "Save Changes" : "Record Expense"}
+                  <button type="submit" className="btn btn-primary px-4">
+                    <i className="bi bi-send me-2"></i> To Admin
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Rejection Modal */}
+      {showRejectModal && rejectingExpense && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1060 }}
+        >
+          <div className="modal-dialog">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title fw-bold">Reject Expense Claim</h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowRejectModal(false)}
+                ></button>
+              </div>
+              <form onSubmit={handleConfirmReject}>
+                <div className="modal-body p-4">
+                  <p className="text-dark">
+                    You are rejecting expense claim{" "}
+                    <strong>
+                      {rejectingExpense.receipt_number || `#${rejectingExpense.id}`}
+                    </strong>{" "}
+                    (₦{Number(rejectingExpense.amount).toLocaleString()}).
+                  </p>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold text-danger">
+                      Rejection Description / Reason *
+                    </label>
+                    <textarea
+                      className="form-control border-danger"
+                      rows="4"
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Explain to the accounting staff why this expense was rejected..."
+                      required
+                    ></textarea>
+                    <small className="text-muted mt-1 d-block">
+                      This description will be sent as a notification to the accounting staff.
+                    </small>
+                  </div>
+                </div>
+                <div className="modal-footer bg-light">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowRejectModal(false)}
+                    disabled={rejectSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-danger"
+                    disabled={rejectSubmitting}
+                  >
+                    {rejectSubmitting ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Rejecting...
+                      </>
+                    ) : (
+                      "Confirm Rejection"
+                    )}
                   </button>
                 </div>
               </form>
