@@ -3,6 +3,21 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import api from "../services/api";
 
+const FALLBACK_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f1f5f9"/><g fill="%2394a3b8"><path d="M160 120h80v100h-80z"/><path d="M200 80l-70 50h140z"/><rect x="180" y="150" width="15" height="30" fill="%23cbd5e1"/><rect x="205" y="150" width="15" height="30" fill="%23cbd5e1"/></g><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="%2364748b">Property Photo Placeholder</text></svg>`;
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return FALLBACK_IMAGE;
+  if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+  const baseUrl = (import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com").replace(/\/api\/?$/, "");
+  const clean = imagePath.startsWith("/") ? imagePath.slice(1) : imagePath;
+  if (clean.startsWith("storage/")) {
+    return `${baseUrl}/${clean}`;
+  }
+  return `${baseUrl}/storage/${clean}`;
+};
+
 export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -14,6 +29,42 @@ export default function PropertyDetail() {
   const [landlordsList, setLandlordsList] = useState([]);
   const [selectedLandlordId, setSelectedLandlordId] = useState("");
   const [assigningLoading, setAssigningLoading] = useState(false);
+
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [newPhotosBase64, setNewPhotosBase64] = useState([]);
+
+  const handlePhotoFileSelect = (e) => {
+    const files = Array.from(e.target.files).slice(0, 4);
+    const base64Promises = files.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(base64Promises).then((base64Strings) => {
+      setNewPhotosBase64(base64Strings);
+    });
+  };
+
+  const handleSavePhotos = async (e) => {
+    e.preventDefault();
+    if (newPhotosBase64.length === 0) return;
+    setUploadingPhotos(true);
+    try {
+      await api.put(`/properties/${id}`, { images: newPhotosBase64 });
+      setShowPhotoModal(false);
+      setNewPhotosBase64([]);
+      fetchPropertyDetails(false);
+    } catch (err) {
+      console.error("Failed to update photos:", err);
+      alert("Failed to save property photos");
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
 
   const fetchPropertyDetails = useCallback(
     async (isInitial = false) => {
@@ -127,44 +178,70 @@ export default function PropertyDetail() {
       </div>
 
       {/* Property Photos Gallery */}
-      {images && images.length > 0 && (
-        <div className="card-light p-4 mb-4">
-          <h5 className="fw-bold mb-3">
+      <div className="card-light p-4 mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="fw-bold mb-0">
             <i className="bi bi-images me-2"></i>
             Property Photos
           </h5>
+          {(userRole === "super_admin" || userRole === "admin" || userRole === "property_officer") && (
+            <button
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => setShowPhotoModal(true)}
+            >
+              <i className="bi bi-upload me-1"></i>
+              {images && images.length > 0 ? "Manage Photos" : "+ Upload Photos"}
+            </button>
+          )}
+        </div>
+
+        {images && images.length > 0 ? (
           <div className="row g-3">
             {images.map((image, index) => (
               <div key={index} className="col-md-6 col-lg-3">
                 <div
-                  className="position-relative overflow-hidden rounded"
+                  className="position-relative overflow-hidden rounded shadow-sm border"
                   style={{
                     height: "200px",
                     cursor: "pointer",
                     transition: "transform 0.3s ease",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.transform = "scale(1.05)")
+                    (e.currentTarget.style.transform = "scale(1.03)")
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.transform = "scale(1)")
                   }
                 >
                   <img
-                    src={`${(import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com/api").replace(/\/api\/?$/, "")}/storage/${image}`}
+                    src={getImageUrl(image)}
                     alt={`${property.name} - Photo ${index + 1}`}
                     className="w-100 h-100 object-fit-cover"
                     onError={(e) => {
-                      e.target.src =
-                        "https://via.placeholder.com/400x300?text=Image+Not+Found";
+                      e.target.src = FALLBACK_IMAGE;
                     }}
                   />
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-4 bg-white rounded border border-dashed">
+            <i className="bi bi-camera text-muted fs-1 d-block mb-2"></i>
+            <p className="text-muted small mb-3">
+              No photos uploaded for this property yet.
+            </p>
+            {(userRole === "super_admin" || userRole === "admin" || userRole === "property_officer") && (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => setShowPhotoModal(true)}
+              >
+                <i className="bi bi-cloud-upload me-1"></i> Upload Photos Now
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Stats Cards */}
       <div className="row g-4 mb-4">
@@ -587,6 +664,92 @@ export default function PropertyDetail() {
                       </>
                     ) : (
                       "Save Assignment"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Upload Modal */}
+      {showPhotoModal && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow-lg">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title fw-bold">
+                  <i className="bi bi-images me-2"></i>
+                  Manage Property Photos - {property.name}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowPhotoModal(false)}
+                ></button>
+              </div>
+              <form onSubmit={handleSavePhotos}>
+                <div className="modal-body p-4">
+                  <p className="text-muted small mb-3">
+                    Upload photos for <strong>{property.name}</strong>. Selected photos are stored persistently. Select up to 4 images.
+                  </p>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-bold">Select Images (Max 4)</label>
+                    <input
+                      type="file"
+                      className="form-control border-primary"
+                      multiple
+                      accept="image/*"
+                      onChange={handlePhotoFileSelect}
+                    />
+                    <small className="text-muted">Choose 1 to 4 image files (PNG, JPG, WEBP)</small>
+                  </div>
+
+                  {newPhotosBase64.length > 0 && (
+                    <div className="mt-3">
+                      <label className="form-label fw-bold small text-muted">Preview Selected Photos:</label>
+                      <div className="row g-2">
+                        {newPhotosBase64.map((b64, idx) => (
+                          <div key={idx} className="col-3">
+                            <img
+                              src={b64}
+                              alt={`Preview ${idx + 1}`}
+                              className="w-100 rounded border"
+                              style={{ height: "90px", objectFit: "cover" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer bg-light">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowPhotoModal(false)}
+                    disabled={uploadingPhotos}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary px-4 fw-bold"
+                    disabled={uploadingPhotos || newPhotosBase64.length === 0}
+                  >
+                    {uploadingPhotos ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Uploading...
+                      </>
+                    ) : (
+                      "Save Property Photos"
                     )}
                   </button>
                 </div>
