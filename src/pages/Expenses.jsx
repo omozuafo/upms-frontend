@@ -142,11 +142,10 @@ function ExpensesContent() {
   const fetchProperties = async () => {
     try {
       const response = await api.get("/properties");
-      const props = Array.isArray(response.data) ? response.data : [];
+      const props = Array.isArray(response.data?.data)
+        ? response.data.data
+        : (Array.isArray(response.data) ? response.data : []);
       setProperties(props);
-      if (props.length > 0 && !formData.property_id) {
-        setFormData((prev) => ({ ...prev, property_id: props[0].id }));
-      }
     } catch (error) {
       console.error("Failed to fetch properties:", error);
       setProperties([]);
@@ -226,7 +225,7 @@ function ExpensesContent() {
       amount: "",
       payment_timestamp: new Date().toISOString().slice(0, 16),
       date: new Date().toISOString().split("T")[0],
-      property_id: properties[0]?.id || "",
+      property_id: "",
       category: "Maintenance",
       vendor: "",
       invoice_number: "",
@@ -267,6 +266,7 @@ function ExpensesContent() {
     try {
       const payload = {
         ...formData,
+        property_id: formData.property_id ? formData.property_id : null,
         status: "Pending", // Always sent as Pending to Admin
       };
 
@@ -774,16 +774,15 @@ function ExpensesContent() {
                     </div>
 
                     <div className="col-md-6">
-                      <label className="form-label fw-semibold">Property *</label>
+                      <label className="form-label fw-semibold">Property</label>
                       <select
                         className="form-select"
                         name="property_id"
-                        value={formData.property_id}
+                        value={formData.property_id || ""}
                         onChange={handleInputChange}
-                        required
                       >
-                        <option value="" disabled>
-                          Select Property
+                        <option value="">
+                          None (General / Company Expense)
                         </option>
                         {safePropertiesList.map((p) => (
                           <option key={p.id} value={p.id}>
