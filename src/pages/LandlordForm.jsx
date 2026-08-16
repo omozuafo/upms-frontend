@@ -21,12 +21,29 @@ export default function LandlordForm() {
 
   const userRole = sessionStorage.getItem("role");
   const [images, setImages] = useState([]);
+  const [propertiesList, setPropertiesList] = useState([]);
+  const [selectedPropertyMode, setSelectedPropertyMode] = useState("dropdown");
 
   useEffect(() => {
     if (isEdit) {
       fetchLandlord();
     }
-  }, [id]);
+    
+    // Fetch properties list for landlord assignment
+    if (userRole === "super_admin" || userRole === "admin") {
+      fetchProperties();
+    }
+  }, [id, isEdit, userRole]);
+
+  const fetchProperties = async () => {
+    try {
+      const res = await api.get("/properties");
+      const propsData = res.data.data || res.data;
+      setPropertiesList(Array.isArray(propsData) ? propsData : []);
+    } catch (err) {
+      console.error("Failed to fetch properties:", err);
+    }
+  };
 
   const fetchLandlord = async () => {
     try {
@@ -301,18 +318,79 @@ export default function LandlordForm() {
                 Add an initial property and unit for this landlord.
               </p>
 
-              {/* Property Details */}
+              {/* Property Selection Dropdown */}
               <div className="mb-3">
-                <label className="form-label fw-semibold">Property Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  name="property_name"
-                  value={formData.property_name || ""}
-                  onChange={handleChange}
-                  placeholder="e.g. Sunset Apartments"
-                required />
+                <label className="form-label fw-semibold">
+                  <i className="bi bi-building-gear me-1"></i> Associated Property
+                </label>
+                <select
+                  className="form-select border-primary"
+                  name="existing_property_id"
+                  value={formData.existing_property_id || (selectedPropertyMode === "new" ? "new" : "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "new") {
+                      setSelectedPropertyMode("new");
+                      setFormData({
+                        ...formData,
+                        existing_property_id: "",
+                        property_name: "",
+                      });
+                    } else {
+                      setSelectedPropertyMode("dropdown");
+                      setFormData({
+                        ...formData,
+                        existing_property_id: val,
+                        property_name: "",
+                      });
+                    }
+                  }}
+                >
+                  <option value="">-- Choose Existing Property from Database --</option>
+                  {propertiesList.map((prop) => (
+                    <option key={prop.id} value={prop.id}>
+                      {prop.name} {prop.address ? `(${prop.address})` : ""} {prop.landlord?.name ? `[Current Landlord: ${prop.landlord.name}]` : "[Unassigned]"}
+                    </option>
+                  ))}
+                  <option value="new">+ Create Brand New Property for this Landlord</option>
+                </select>
+                <small className="text-muted mt-1 d-block">
+                  Select an existing property in the database to link to this landlord, or choose "+ Create Brand New Property".
+                </small>
               </div>
+
+              {/* Selected Existing Property Confirmation Banner */}
+              {formData.existing_property_id && (
+                <div className="alert alert-primary d-flex align-items-center mb-3 shadow-sm border-0">
+                  <i className="bi bi-check-circle-fill fs-4 me-3 text-primary"></i>
+                  <div>
+                    <div className="fw-bold">Property Selected for Assignment</div>
+                    <small className="text-primary-emphasis">
+                      {propertiesList.find(p => String(p.id) === String(formData.existing_property_id))?.name} (Address: {propertiesList.find(p => String(p.id) === String(formData.existing_property_id))?.address || "N/A"}) will be linked to this landlord upon submission.
+                    </small>
+                  </div>
+                </div>
+              )}
+
+              {/* Brand New Property Form (if "+ Create Brand New Property" selected) */}
+              {selectedPropertyMode === "new" && (
+                <div className="border rounded p-3 bg-white mb-3">
+                  <h6 className="fw-bold mb-3 text-primary">
+                    <i className="bi bi-plus-circle me-2"></i>
+                    New Property Information
+                  </h6>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Property Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="property_name"
+                      value={formData.property_name || ""}
+                      onChange={handleChange}
+                      placeholder="e.g. Sunset Apartments"
+                      required
+                    />
+                  </div>
 
               {formData.property_name && (
                 <>
@@ -440,6 +518,8 @@ export default function LandlordForm() {
                     </div>
                   </div>
                 </>
+              )}
+                </div>
               )}
             </div>
           )}

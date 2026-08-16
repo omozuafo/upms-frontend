@@ -121,7 +121,7 @@ export default function PropertyDetail() {
                   }
                 >
                   <img
-                    src={`http://127.0.0.1:8000/storage/${image}`}
+                    src={`${(import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com/api").replace(/\/api\/?$/, "")}/storage/${image}`}
                     alt={`${property.name} - Photo ${index + 1}`}
                     className="w-100 h-100 object-fit-cover"
                     onError={(e) => {
