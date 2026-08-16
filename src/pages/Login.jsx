@@ -47,13 +47,13 @@ export default function Login() {
         <div className="card-body p-4">
           <div className="text-center mb-4">
             <div
-              className="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-              style={{ width: "60px", height: "60px" }}
+              className="text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow"
+              style={{ width: "64px", height: "64px", background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)" }}
             >
               <i className="bi bi-building fs-2"></i>
             </div>
-            <h2 className="h3 fw-bold mb-1">Welcome Back</h2>
-            <p className="text-muted small">Sign in to your account</p>
+            <h2 className="h3 fw-bold mb-1 text-dark">Banksomegroup</h2>
+            <p className="text-muted small">Property Management System</p>
           </div>
           
           {formError && (

@@ -183,11 +183,11 @@ export default function Layout() {
         {/* Logo */}
         <div className="p-4 border-bottom">
           <div className="d-flex align-items-center">
-            <div className="bg-primary rounded p-2 me-3">
+            <div className="bg-primary rounded-3 p-2 me-3 shadow-sm" style={{ background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)" }}>
               <i className="bi bi-building text-white fs-5"></i>
             </div>
             <div>
-              <h1 className="h5 fw-bold text-dark mb-0">UPMS</h1>
+              <h1 className="h5 fw-bold text-dark mb-0" style={{ letterSpacing: "0.5px" }}>Banksomegroup</h1>
               <p className="text-muted small mb-0">Property Management</p>
             </div>
           </div>
