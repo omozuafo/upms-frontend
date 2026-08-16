@@ -321,7 +321,7 @@ export default function LandlordForm() {
               {/* Property Selection Dropdown */}
               <div className="mb-3">
                 <label className="form-label fw-semibold">
-                  <i className="bi bi-building-gear me-1"></i> Associated Property
+                  <i className="bi bi-building-gear me-1"></i> Associated Property (Unassigned Only)
                 </label>
                 <select
                   className="form-select border-primary"
@@ -346,16 +346,22 @@ export default function LandlordForm() {
                     }
                   }}
                 >
-                  <option value="">-- Choose Existing Property from Database --</option>
-                  {propertiesList.map((prop) => (
-                    <option key={prop.id} value={prop.id}>
-                      {prop.name} {prop.address ? `(${prop.address})` : ""} {prop.landlord?.name ? `[Current Landlord: ${prop.landlord.name}]` : "[Unassigned]"}
-                    </option>
-                  ))}
+                  <option value="">
+                    {propertiesList.filter(p => !p.landlord_id && !p.landlord).length > 0
+                      ? "-- Choose Unassigned Property from Database --"
+                      : "-- No Unassigned Properties Available --"}
+                  </option>
+                  {propertiesList
+                    .filter((prop) => !prop.landlord_id && !prop.landlord)
+                    .map((prop) => (
+                      <option key={prop.id} value={prop.id}>
+                        {prop.name} {prop.address ? `(${prop.address})` : ""} [Unassigned]
+                      </option>
+                    ))}
                   <option value="new">+ Create Brand New Property for this Landlord</option>
                 </select>
                 <small className="text-muted mt-1 d-block">
-                  Select an existing property in the database to link to this landlord, or choose "+ Create Brand New Property".
+                  Only unassigned properties are displayed above. Properties already assigned to a landlord can only be reassigned by editing the property directly.
                 </small>
               </div>
 
