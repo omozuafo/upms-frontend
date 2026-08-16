@@ -172,7 +172,9 @@ export default function UserForm() {
                   className="form-select"
                   required
                 >
-                  <option value="super_admin">Super Admin</option>
+                  {sessionStorage.getItem("role") === "super_admin" && (
+                    <option value="super_admin">Super Admin</option>
+                  )}
                   <option value="admin">Admin</option>
                   <option value="property_officer">Property Officer</option>
                   <option value="accounting_staff">Accounting Staff</option>

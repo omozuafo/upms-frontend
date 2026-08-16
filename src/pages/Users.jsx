@@ -218,18 +218,38 @@ export default function Users() {
                               <i className="bi bi-wallet2"></i>
                             </button>
                           )}
-                          <Link
-                            to={`/users/${user.id}/edit`}
-                            className="btn btn-sm btn-outline-primary"
-                          >
-                            <i className="bi bi-pencil"></i>
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(user.id, user.name)}
-                            className="btn btn-sm btn-outline-danger"
-                          >
-                            <i className="bi bi-trash"></i>
-                          </button>
+                          {user.role === "super_admin" && userRole !== "super_admin" ? (
+                            <button
+                              className="btn btn-sm btn-outline-secondary opacity-50"
+                              disabled
+                              title="Only Super Admin can edit Super Admin accounts"
+                            >
+                              <i className="bi bi-lock-fill me-1"></i> Edit
+                            </button>
+                          ) : (
+                            <Link
+                              to={`/users/${user.id}/edit`}
+                              className="btn btn-sm btn-outline-primary"
+                            >
+                              <i className="bi bi-pencil"></i>
+                            </Link>
+                          )}
+                          {user.role === "super_admin" && userRole !== "super_admin" ? (
+                            <button
+                              className="btn btn-sm btn-outline-secondary opacity-50"
+                              disabled
+                              title="Only Super Admin can delete Super Admin accounts"
+                            >
+                              <i className="bi bi-shield-lock-fill"></i>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(user.id, user.name)}
+                              className="btn btn-sm btn-outline-danger"
+                            >
+                              <i className="bi bi-trash"></i>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
