@@ -75,6 +75,7 @@ function ExpensesContent() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [availableUnits, setAvailableUnits] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -86,6 +87,7 @@ function ExpensesContent() {
     payment_timestamp: new Date().toISOString().slice(0, 16),
     date: new Date().toISOString().split("T")[0],
     property_id: "",
+    unit_id: "",
     category: "Maintenance",
     vendor: "",
     invoice_number: "",
@@ -156,6 +158,24 @@ function ExpensesContent() {
       setProperties([]);
     }
   };
+
+  useEffect(() => {
+    if (!formData.property_id) {
+      setAvailableUnits([]);
+      return;
+    }
+    api
+      .get(`/properties/${formData.property_id}`)
+      .then((res) => {
+        const prop = res.data?.property || res.data;
+        const units = prop?.units || [];
+        setAvailableUnits(Array.isArray(units) ? units : []);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch property units:", err);
+        setAvailableUnits([]);
+      });
+  }, [formData.property_id]);
 
   useEffect(() => {
     const token = sessionStorage.getItem("token");
@@ -232,6 +252,7 @@ function ExpensesContent() {
       payment_timestamp: new Date().toISOString().slice(0, 16),
       date: new Date().toISOString().split("T")[0],
       property_id: "",
+      unit_id: "",
       category: "Maintenance",
       vendor: "",
       invoice_number: "",
@@ -253,6 +274,7 @@ function ExpensesContent() {
         : new Date().toISOString().slice(0, 16),
       date: expense.date ? expense.date.split("T")[0] : new Date().toISOString().split("T")[0],
       property_id: expense.property_id || "",
+      unit_id: expense.unit_id || "",
       category: expense.category || "Maintenance",
       vendor: expense.vendor || "",
       invoice_number: expense.invoice_number || "",
@@ -263,7 +285,11 @@ function ExpensesContent() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "property_id") {
+      setFormData((prev) => ({ ...prev, property_id: value, unit_id: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   // Submit to Admin
@@ -273,6 +299,7 @@ function ExpensesContent() {
       const payload = {
         ...formData,
         property_id: formData.property_id ? formData.property_id : null,
+        unit_id: formData.unit_id ? formData.unit_id : null,
         status: "Pending", // Always sent as Pending to Admin
       };
 
@@ -666,7 +693,23 @@ function ExpensesContent() {
                         </small>
                       )}
                     </td>
-                    <td>{expense.property?.name || "N/A"}</td>
+                    <td>
+                      {expense.property ? (
+                        <div>
+                          <span className="fw-medium text-dark">{expense.property.name}</span>
+                          {expense.unit && (
+                            <small className="d-block text-muted">
+                              {expense.unit.unit_number}
+                              {expense.unit.tenant?.name
+                                ? ` (${expense.unit.tenant.name})`
+                                : " (Vacant)"}
+                            </small>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="badge bg-light text-secondary border">General Expense</span>
+                      )}
+                    </td>
                     <td>
                       {expense.account_name || expense.account_number ? (
                         <div>
@@ -795,6 +838,34 @@ function ExpensesContent() {
                             {p.name}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Unit (Optional)</label>
+                      <select
+                        className="form-select"
+                        name="unit_id"
+                        value={formData.unit_id || ""}
+                        onChange={handleInputChange}
+                        disabled={!formData.property_id}
+                      >
+                        <option value="">
+                          {!formData.property_id
+                            ? "N/A - Select Property first"
+                            : "All Units / Entire Property"}
+                        </option>
+                        {availableUnits.map((u) => {
+                          const tenantName = u.tenant?.name || u.tenant_name;
+                          const label = tenantName
+                            ? `${u.unit_number} — Tenant: ${tenantName}`
+                            : `${u.unit_number} — Vacant (No Tenant)`;
+                          return (
+                            <option key={u.id} value={u.id}>
+                              {label}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
