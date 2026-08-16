@@ -7,10 +7,34 @@ export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [unitFilter, setUnitFilter] = useState("All");
+  const userRole = sessionStorage.getItem("role");
   const [showLandlordModal, setShowLandlordModal] = useState(false);
   const [landlordsList, setLandlordsList] = useState([]);
   const [selectedLandlordId, setSelectedLandlordId] = useState("");
   const [assigningLoading, setAssigningLoading] = useState(false);
+
+  const fetchPropertyDetails = useCallback(
+    async (isInitial = false) => {
+      try {
+        if (isInitial) setLoading(true);
+        const response = await api.get(`/properties/${id}`);
+        setData(response.data);
+      } catch (error) {
+        console.error("Failed to fetch property details:", error);
+      } finally {
+        if (isInitial) setLoading(false);
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    fetchPropertyDetails(true);
+  }, [fetchPropertyDetails]);
+
+  useAutoRefresh(() => fetchPropertyDetails(false));
 
   const openLandlordModal = async () => {
     try {
