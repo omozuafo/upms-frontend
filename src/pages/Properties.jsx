@@ -22,7 +22,7 @@ const parseImages = (imagesField) => {
 };
 
 const getImageUrl = (imagePath) => {
-  if (!imagePath) return FALLBACK_PROPERTY_IMAGE;
+  if (!imagePath || typeof imagePath !== "string") return FALLBACK_PROPERTY_IMAGE;
   if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return imagePath;
   }
