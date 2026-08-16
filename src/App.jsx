@@ -47,13 +47,15 @@ const LoadingFallback = () => (
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { RefreshProvider } from "./contexts/RefreshContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   return (
-    <RefreshProvider>
-      <Router>
-        <ToastContainer position="top-right" autoClose={3000} />
-        <Suspense fallback={<LoadingFallback />}>
+    <ErrorBoundary>
+      <RefreshProvider>
+        <Router>
+          <ToastContainer position="top-right" autoClose={3000} />
+          <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -95,7 +97,8 @@ function App() {
         </Suspense>
       </Router>
     </RefreshProvider>
-  );
+  </ErrorBoundary>
+);
 }
 
 export default App;

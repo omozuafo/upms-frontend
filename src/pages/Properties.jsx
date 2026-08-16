@@ -7,6 +7,20 @@ import ConfirmationModal from "../components/ConfirmationModal";
 
 const FALLBACK_PROPERTY_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200"><rect width="400" height="200" fill="%23f1f5f9"/><g fill="%2394a3b8"><path d="M160 70h80v80h-80z"/><path d="M200 40l-60 40h120z"/><rect x="180" y="100" width="12" height="20" fill="%23cbd5e1"/><rect x="200" y="100" width="12" height="20" fill="%23cbd5e1"/></g><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="%2364748b">Property Photo</text></svg>`;
 
+const parseImages = (imagesField) => {
+  if (!imagesField) return [];
+  if (Array.isArray(imagesField)) return imagesField;
+  if (typeof imagesField === "string") {
+    try {
+      const parsed = JSON.parse(imagesField);
+      return Array.isArray(parsed) ? parsed : [imagesField];
+    } catch (e) {
+      return [imagesField];
+    }
+  }
+  return [];
+};
+
 const getImageUrl = (imagePath) => {
   if (!imagePath) return FALLBACK_PROPERTY_IMAGE;
   if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
@@ -251,11 +265,7 @@ export default function Properties() {
                       {/* Property Image */}
                       <div style={{ height: "200px", overflow: "hidden" }}>
                         <img
-                          src={getImageUrl(
-                            property.images
-                              ? (typeof property.images === "string" ? JSON.parse(property.images) : property.images)[0]
-                              : null
-                          )}
+                          src={getImageUrl(parseImages(property.images)[0])}
                           alt={property.name}
                           className="w-100 h-100 object-fit-cover"
                           onError={(e) => {
