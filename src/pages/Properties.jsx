@@ -5,7 +5,12 @@ import api from "../services/api";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../components/ConfirmationModal";
 
-const FALLBACK_PROPERTY_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200"><rect width="400" height="200" fill="%23f1f5f9"/><g fill="%2394a3b8"><path d="M160 70h80v80h-80z"/><path d="M200 40l-60 40h120z"/><rect x="180" y="100" width="12" height="20" fill="%23cbd5e1"/><rect x="200" y="100" width="12" height="20" fill="%23cbd5e1"/></g><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="%2364748b">Property Photo</text></svg>`;
+const DEFAULT_PROPERTY_IMAGES = [
+  "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"
+];
 
 const parseImages = (imagesField) => {
   if (!imagesField) return [];
@@ -21,8 +26,9 @@ const parseImages = (imagesField) => {
   return [];
 };
 
-const getImageUrl = (imagePath) => {
-  if (!imagePath || typeof imagePath !== "string") return FALLBACK_PROPERTY_IMAGE;
+const getImageUrl = (imagePath, propertyId = 0) => {
+  const fallback = DEFAULT_PROPERTY_IMAGES[Math.abs(Number(propertyId) || 0) % DEFAULT_PROPERTY_IMAGES.length];
+  if (!imagePath || typeof imagePath !== "string") return fallback;
   if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return imagePath;
   }
@@ -266,11 +272,12 @@ export default function Properties() {
                       {/* Property Image */}
                       <div style={{ height: "200px", overflow: "hidden" }}>
                         <img
-                          src={getImageUrl(parseImages(property.images)[0])}
+                          src={getImageUrl(parseImages(property.images)[0], property.id)}
                           alt={property.name}
                           className="w-100 h-100 object-fit-cover"
                           onError={(e) => {
-                            e.target.src = FALLBACK_PROPERTY_IMAGE;
+                            const idx = Math.abs(Number(property.id) || 0) % DEFAULT_PROPERTY_IMAGES.length;
+                            e.target.src = DEFAULT_PROPERTY_IMAGES[idx];
                           }}
                         />
                       </div>

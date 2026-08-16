@@ -3,10 +3,16 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import api from "../services/api";
 
-const FALLBACK_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f1f5f9"/><g fill="%2394a3b8"><path d="M160 120h80v100h-80z"/><path d="M200 80l-70 50h140z"/><rect x="180" y="150" width="15" height="30" fill="%23cbd5e1"/><rect x="205" y="150" width="15" height="30" fill="%23cbd5e1"/></g><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="%2364748b">Property Photo Placeholder</text></svg>`;
+const DEFAULT_PROPERTY_IMAGES = [
+  "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"
+];
 
-const getImageUrl = (imagePath) => {
-  if (!imagePath || typeof imagePath !== "string") return FALLBACK_IMAGE;
+const getImageUrl = (imagePath, propertyId = 0) => {
+  const fallback = DEFAULT_PROPERTY_IMAGES[Math.abs(Number(propertyId) || 0) % DEFAULT_PROPERTY_IMAGES.length];
+  if (!imagePath || typeof imagePath !== "string") return fallback;
   if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return imagePath;
   }
