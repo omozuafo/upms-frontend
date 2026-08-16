@@ -10,33 +10,30 @@ import "./App.css";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
-
-// Lazy load feature page components for code splitting
-const Register = lazy(() => import("./pages/Register"));
-const Properties = lazy(() => import("./pages/Properties"));
-const PropertyDetail = lazy(() => import("./pages/PropertyDetail"));
-const PropertyForm = lazy(() => import("./pages/PropertyForm"));
-const Tenants = lazy(() => import("./pages/Tenants"));
-const TenantDetail = lazy(() => import("./pages/TenantDetail"));
-const Units = lazy(() => import("./pages/Units"));
-const Leases = lazy(() => import("./pages/Leases"));
-
-const Payments = lazy(() => import("./pages/Payments"));
-const PaymentForm = lazy(() => import("./pages/PaymentForm"));
-const AuditTrail = lazy(() => import("./pages/AuditTrail"));
-const Maintenance = lazy(() => import("./pages/Maintenance"));
-const MaintenanceForm = lazy(() => import("./pages/MaintenanceForm"));
-const MaintenanceDetail = lazy(() => import("./pages/MaintenanceDetail"));
-const Notifications = lazy(() => import("./pages/Notifications"));
-const TenantPortal = lazy(() => import("./pages/TenantPortal"));
-const Users = lazy(() => import("./pages/Users"));
-const UserForm = lazy(() => import("./pages/UserForm"));
-const Landlords = lazy(() => import("./pages/Landlords"));
-const LandlordForm = lazy(() => import("./pages/LandlordForm"));
-const Messages = lazy(() => import("./pages/Messages"));
-const MessageForm = lazy(() => import("./pages/MessageForm"));
-const MessageDetail = lazy(() => import("./pages/MessageDetail"));
-const Expenses = lazy(() => import("./pages/Expenses"));
+import Register from "./pages/Register";
+import Properties from "./pages/Properties";
+import PropertyDetail from "./pages/PropertyDetail";
+import PropertyForm from "./pages/PropertyForm";
+import Tenants from "./pages/Tenants";
+import TenantDetail from "./pages/TenantDetail";
+import Units from "./pages/Units";
+import Leases from "./pages/Leases";
+import Payments from "./pages/Payments";
+import PaymentForm from "./pages/PaymentForm";
+import AuditTrail from "./pages/AuditTrail";
+import Maintenance from "./pages/Maintenance";
+import MaintenanceForm from "./pages/MaintenanceForm";
+import MaintenanceDetail from "./pages/MaintenanceDetail";
+import Notifications from "./pages/Notifications";
+import TenantPortal from "./pages/TenantPortal";
+import Users from "./pages/Users";
+import UserForm from "./pages/UserForm";
+import Landlords from "./pages/Landlords";
+import LandlordForm from "./pages/LandlordForm";
+import Messages from "./pages/Messages";
+import MessageForm from "./pages/MessageForm";
+import MessageDetail from "./pages/MessageDetail";
+import Expenses from "./pages/Expenses";
 
 // Loading fallback component
 const LoadingFallback = () => (

@@ -5,6 +5,21 @@ import api from "../services/api";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../components/ConfirmationModal";
 
+const FALLBACK_PROPERTY_IMAGE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200"><rect width="400" height="200" fill="%23f1f5f9"/><g fill="%2394a3b8"><path d="M160 70h80v80h-80z"/><path d="M200 40l-60 40h120z"/><rect x="180" y="100" width="12" height="20" fill="%23cbd5e1"/><rect x="200" y="100" width="12" height="20" fill="%23cbd5e1"/></g><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="%2364748b">Property Photo</text></svg>`;
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return FALLBACK_PROPERTY_IMAGE;
+  if (imagePath.startsWith("data:") || imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+  const baseUrl = (import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com").replace(/\/api\/?$/, "");
+  const clean = imagePath.startsWith("/") ? imagePath.slice(1) : imagePath;
+  if (clean.startsWith("storage/")) {
+    return `${baseUrl}/${clean}`;
+  }
+  return `${baseUrl}/storage/${clean}`;
+};
+
 export default function Properties() {
   const { id: landlordIdParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -236,17 +251,15 @@ export default function Properties() {
                       {/* Property Image */}
                       <div style={{ height: "200px", overflow: "hidden" }}>
                         <img
-                          src={
-                            property.images &&
-                            (typeof property.images === "string" ? JSON.parse(property.images) : property.images).length > 0
-                              ? `${import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com"}/storage/${(typeof property.images === "string" ? JSON.parse(property.images) : property.images)[0]}`
-                              : "https://via.placeholder.com/400x200?text=No+Image"
-                          }
+                          src={getImageUrl(
+                            property.images
+                              ? (typeof property.images === "string" ? JSON.parse(property.images) : property.images)[0]
+                              : null
+                          )}
                           alt={property.name}
                           className="w-100 h-100 object-fit-cover"
                           onError={(e) => {
-                            e.target.src =
-                              "https://via.placeholder.com/400x200?text=Image+Error";
+                            e.target.src = FALLBACK_PROPERTY_IMAGE;
                           }}
                         />
                       </div>
