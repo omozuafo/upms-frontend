@@ -141,10 +141,15 @@ function ExpensesContent() {
 
   const fetchProperties = async () => {
     try {
-      const response = await api.get("/properties");
-      const props = Array.isArray(response.data?.data)
-        ? response.data.data
-        : (Array.isArray(response.data) ? response.data : []);
+      const response = await api.get("/properties?per_page=100");
+      let props = [];
+      if (Array.isArray(response.data)) {
+        props = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        props = response.data.data;
+      } else if (response.data && response.data.properties && Array.isArray(response.data.properties)) {
+        props = response.data.properties;
+      }
       setProperties(props);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
@@ -216,6 +221,7 @@ function ExpensesContent() {
   });
 
   const handleOpenAdd = () => {
+    fetchProperties();
     setEditingExpense(null);
     setFormData({
       receipt_number: `RCP-${Math.floor(100000 + Math.random() * 900000)}`,
