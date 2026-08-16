@@ -69,6 +69,7 @@ function App() {
               <Route path="/landlords" element={<Landlords />} />
               <Route path="/landlords/new" element={<LandlordForm />} />
               <Route path="/landlords/:id/edit" element={<LandlordForm />} />
+              <Route path="/landlords/:id/properties" element={<Properties />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/properties/new" element={<PropertyForm />} />
@@ -91,6 +92,7 @@ function App() {
               <Route path="/portal" element={<TenantPortal />} />
             </Route>
 
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>

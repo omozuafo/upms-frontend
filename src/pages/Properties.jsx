@@ -1,17 +1,34 @@
 import { useEffect, useState, useCallback } from "react";
 import useRealtime from "../hooks/useRealtime";
-import { Link } from "react-router-dom";
+import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../components/ConfirmationModal";
 
 export default function Properties() {
+  const { id: landlordIdParam } = useParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const landlordIdFilter = landlordIdParam || searchParams.get("landlord_id");
+
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState(null);
+  const [landlordInfo, setLandlordInfo] = useState(null);
   const userRole = sessionStorage.getItem("role");
+
+  useEffect(() => {
+    if (landlordIdFilter) {
+      api
+        .get(`/landlords/${landlordIdFilter}`)
+        .then((res) => setLandlordInfo(res.data))
+        .catch(() => setLandlordInfo(null));
+    } else {
+      setLandlordInfo(null);
+    }
+  }, [landlordIdFilter]);
 
   const fetchProperties = useCallback(async (isInitial = false) => {
     try {
@@ -65,6 +82,23 @@ export default function Properties() {
     }
   };
 
+  const filteredProperties = properties.filter((property) => {
+    // 1. Filter by Landlord if active
+    if (landlordIdFilter) {
+      const pLandlordId = property.landlord_id || property.landlord?.id;
+      if (String(pLandlordId) !== String(landlordIdFilter)) {
+        return false;
+      }
+    }
+
+    // 2. Search term filter
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const nameMatch = property.name?.toLowerCase().includes(term);
+    const addressMatch = property.address?.toLowerCase().includes(term);
+    return nameMatch || addressMatch;
+  });
+
   if (loading) return <div className="p-4">Loading...</div>;
 
   return (
@@ -85,7 +119,28 @@ export default function Properties() {
         )}
       </div>
 
-      {properties.length === 0 ? (
+      {/* Active Landlord Filter Banner */}
+      {landlordIdFilter && (
+        <div className="alert alert-info d-flex justify-content-between align-items-center mb-4 shadow-sm border-0">
+          <div>
+            <i className="bi bi-person-badge-fill me-2 fs-5 text-primary"></i>
+            <span>
+              Showing properties managed by Landlord:{" "}
+              <strong>
+                {landlordInfo ? `${landlordInfo.name} (${landlordInfo.email})` : `Landlord #${landlordIdFilter}`}
+              </strong>
+            </span>
+          </div>
+          <button
+            className="btn btn-sm btn-outline-primary bg-white fw-semibold"
+            onClick={() => navigate("/properties")}
+          >
+            <i className="bi bi-x-circle me-1"></i> Clear Filter
+          </button>
+        </div>
+      )}
+
+      {filteredProperties.length === 0 ? (
         <div className="text-center py-5">
           <div className="mb-4">
             <i
@@ -93,8 +148,16 @@ export default function Properties() {
               style={{ fontSize: "64px" }}
             ></i>
           </div>
-          <h5 className="text-muted">No properties found</h5>
-          <p className="text-muted">There are no properties matching your query.</p>
+          <h5 className="text-muted">
+            {landlordIdFilter
+              ? "No properties assigned to this landlord"
+              : "No properties found"}
+          </h5>
+          <p className="text-muted">
+            {landlordIdFilter
+              ? "This landlord does not have any associated properties yet."
+              : "There are no properties matching your query."}
+          </p>
           {(userRole === "admin" || userRole === "super_admin") && (
             <Link to="/properties/new" className="btn btn-primary mt-3">
               <i className="bi bi-plus-circle me-2"></i>
@@ -136,17 +199,7 @@ export default function Properties() {
                     </tr>
                   </thead>
                   <tbody>
-                    {properties
-                      .filter(
-                        (property) =>
-                          property.name
-                            ?.toLowerCase()
-                            .includes(searchTerm.toLowerCase()) ||
-                          property.address
-                            ?.toLowerCase()
-                            .includes(searchTerm.toLowerCase()),
-                      )
-                      .map((property) => (
+                    {filteredProperties.map((property) => (
                         <tr key={property.id}>
                           <td className="fw-semibold">
                             <div className="d-flex align-items-center">
@@ -177,17 +230,7 @@ export default function Properties() {
             </div>
           ) : (
             <div className="row g-4">
-              {properties
-                .filter(
-                  (property) =>
-                    property.name
-                      ?.toLowerCase()
-                      .includes(searchTerm.toLowerCase()) ||
-                    property.address
-                      ?.toLowerCase()
-                      .includes(searchTerm.toLowerCase()),
-                )
-                .map((property) => (
+              {filteredProperties.map((property) => (
                   <div key={property.id} className="col-12 col-md-6 col-lg-4">
                     <div className="card-light h-100 p-0 overflow-hidden">
                       {/* Property Image */}
@@ -195,8 +238,8 @@ export default function Properties() {
                         <img
                           src={
                             property.images &&
-                            JSON.parse(property.images).length > 0
-                              ? `http://127.0.0.1:8000/storage/${JSON.parse(property.images)[0]}`
+                            (typeof property.images === "string" ? JSON.parse(property.images) : property.images).length > 0
+                              ? `${import.meta.env.VITE_API_URL || "https://upms-backend.onrender.com"}/storage/${(typeof property.images === "string" ? JSON.parse(property.images) : property.images)[0]}`
                               : "https://via.placeholder.com/400x200?text=No+Image"
                           }
                           alt={property.name}
