@@ -250,7 +250,7 @@ export default function LandlordForm() {
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="+1 (555) 000-0000"
-                required />
+                />
               </div>
 
               <div className="mb-4">
@@ -258,7 +258,7 @@ export default function LandlordForm() {
                   htmlFor="company_name"
                   className="form-label fw-semibold"
                 >
-                  Company Name
+                  Company Name (Optional)
                 </label>
                 <input
                   type="text"
@@ -268,7 +268,7 @@ export default function LandlordForm() {
                   value={formData.company_name}
                   onChange={handleChange}
                   placeholder="Company or business name (optional)"
-                required />
+                />
                 <small className="text-muted">
                   Optional company or business name for corporate landlords
                 </small>
@@ -421,7 +421,7 @@ export default function LandlordForm() {
                         name="property_type"
                         value={formData.property_type || "Residential"}
                         onChange={handleChange}
-                      required >
+                      >
                         <option value="Residential">Residential</option>
                         <option value="Commercial">Commercial</option>
                         <option value="Industrial">Industrial</option>
@@ -439,7 +439,7 @@ export default function LandlordForm() {
                       value={formData.property_description || ""}
                       onChange={handleChange}
                       rows="2"
-                    required ></textarea>
+                    ></textarea>
                   </div>
 
                   <div className="mb-3">
@@ -452,7 +452,7 @@ export default function LandlordForm() {
                       multiple
                       accept="image/*"
                       onChange={handleImageChange}
-                    required />
+                    />
                     <small className="text-muted">Select up to 4 images</small>
                   </div>
 
@@ -503,7 +503,7 @@ export default function LandlordForm() {
                         name="unit_type"
                         value={formData.unit_type || "1BHK"}
                         onChange={handleChange}
-                      required >
+                      >
                         <option value="Studio">Studio</option>
                         <option value="1BHK">1BHK</option>
                         <option value="2BHK">2BHK</option>
