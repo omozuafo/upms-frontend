@@ -25,12 +25,16 @@ api.interceptors.response.use(
   (error) => {
     // Check if the error is due to unauthenticated (401)
     if (error.response && error.response.status === 401) {
-      toast.error("Session expired. Please login again.");
-      // Clear the token from localStorage
-      sessionStorage.removeItem("token");
-
-      // Redirect to login page
-      window.location.href = "/login";
+      const currentPath = window.location.pathname;
+      const isLoginRoute = currentPath === "/login" || error.config?.url?.includes("/auth/login");
+      
+      if (!isLoginRoute && sessionStorage.getItem("token")) {
+        toast.error("Session expired. Please login again.");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("role");
+        sessionStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(error);

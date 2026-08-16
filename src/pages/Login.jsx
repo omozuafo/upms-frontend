@@ -21,6 +21,7 @@ export default function Login() {
       console.log("Login successful:", response.data);
       sessionStorage.setItem("token", response.data.access_token);
       sessionStorage.setItem("role", response.data.user.role);
+      sessionStorage.setItem("user", JSON.stringify(response.data.user));
       toast.success("Login successful!");
       navigate("/dashboard");
     } catch (error) {

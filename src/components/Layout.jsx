@@ -7,12 +7,19 @@ import { useRefresh } from "../contexts/RefreshContext";
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("user");
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [maintenanceBadgeCount, setMaintenanceBadgeCount] = useState(0);
   const [paymentBadgeCount, setPaymentBadgeCount] = useState(0);
-  const userRole = sessionStorage.getItem("role");
+  const userRole = user?.role || sessionStorage.getItem("role");
   const { triggerRefresh } = useRefresh();
 
   // Debounce function removed as global click capture causes severe performance issues
@@ -39,12 +46,18 @@ export default function Layout() {
       try {
         const response = await api.post("/auth/me");
         setUser(response.data);
-        if (response.data && response.data.role) {
-          sessionStorage.setItem("role", response.data.role);
+        if (response.data) {
+          sessionStorage.setItem("user", JSON.stringify(response.data));
+          if (response.data.role) {
+            sessionStorage.setItem("role", response.data.role);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch user:", error);
-        navigate("/login");
+        // Only redirect to login if there is no token in sessionStorage
+        if (!sessionStorage.getItem("token")) {
+          navigate("/login");
+        }
       }
     };
 
@@ -62,6 +75,7 @@ export default function Layout() {
   const handleLogout = () => {
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("role");
+    sessionStorage.removeItem("user");
     navigate("/login");
   };
 

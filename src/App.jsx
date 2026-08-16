@@ -7,10 +7,12 @@ import {
 import { lazy, Suspense } from "react";
 import "./App.css";
 
-// Lazy load all page components for better performance
-const Login = lazy(() => import("./pages/Login"));
+import Login from "./pages/Login";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+
+// Lazy load feature page components for code splitting
 const Register = lazy(() => import("./pages/Register"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Properties = lazy(() => import("./pages/Properties"));
 const PropertyDetail = lazy(() => import("./pages/PropertyDetail"));
 const PropertyForm = lazy(() => import("./pages/PropertyForm"));
@@ -35,7 +37,6 @@ const Messages = lazy(() => import("./pages/Messages"));
 const MessageForm = lazy(() => import("./pages/MessageForm"));
 const MessageDetail = lazy(() => import("./pages/MessageDetail"));
 const Expenses = lazy(() => import("./pages/Expenses"));
-const Layout = lazy(() => import("./components/Layout"));
 
 // Loading fallback component
 const LoadingFallback = () => (
