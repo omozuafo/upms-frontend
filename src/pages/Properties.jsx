@@ -111,7 +111,8 @@ export default function Properties() {
     }
   };
 
-  const filteredProperties = properties.filter((property) => {
+  const filteredProperties = (Array.isArray(properties) ? properties : []).filter((property) => {
+    if (!property || typeof property !== "object") return false;
     // 1. Filter by Landlord if active
     if (landlordIdFilter) {
       const pLandlordId = property.landlord_id || property.landlord?.id;
@@ -123,8 +124,8 @@ export default function Properties() {
     // 2. Search term filter
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    const nameMatch = property.name?.toLowerCase().includes(term);
-    const addressMatch = property.address?.toLowerCase().includes(term);
+    const nameMatch = (property.name || "").toLowerCase().includes(term);
+    const addressMatch = (property.address || "").toLowerCase().includes(term);
     return nameMatch || addressMatch;
   });
 
