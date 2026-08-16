@@ -158,12 +158,6 @@ export default function Layout() {
       icon: "bi-envelope",
       roles: ["all"],
     },
-    {
-      path: "/documents",
-      label: "Documents",
-      icon: "bi-folder",
-      roles: ["super_admin", "admin"],
-    },
   ];
 
   const shouldShowNav = (navRoles) => {
