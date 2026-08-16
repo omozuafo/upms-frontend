@@ -7,30 +7,36 @@ export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [unitFilter, setUnitFilter] = useState("All");
-  const userRole = sessionStorage.getItem("role");
+  const [showLandlordModal, setShowLandlordModal] = useState(false);
+  const [landlordsList, setLandlordsList] = useState([]);
+  const [selectedLandlordId, setSelectedLandlordId] = useState("");
+  const [assigningLoading, setAssigningLoading] = useState(false);
 
-  const fetchPropertyDetails = useCallback(
-    async (isInitial = false) => {
-      try {
-        if (isInitial) setLoading(true);
-        const response = await api.get(`/properties/${id}`);
-        setData(response.data);
-      } catch (error) {
-        console.error("Failed to fetch property details:", error);
-      } finally {
-        if (isInitial) setLoading(false);
-      }
-    },
-    [id],
-  );
+  const openLandlordModal = async () => {
+    try {
+      const res = await api.get("/landlords");
+      setLandlordsList(Array.isArray(res.data) ? res.data : []);
+      setSelectedLandlordId(data?.property?.landlord_id || "");
+      setShowLandlordModal(true);
+    } catch (err) {
+      console.error("Failed to fetch landlords list:", err);
+    }
+  };
 
-  useEffect(() => {
-    fetchPropertyDetails(true);
-  }, [fetchPropertyDetails]);
-
-  useAutoRefresh(() => fetchPropertyDetails(false));
+  const handleSaveLandlord = async (e) => {
+    e.preventDefault();
+    setAssigningLoading(true);
+    try {
+      await api.put(`/properties/${id}`, { landlord_id: selectedLandlordId || null });
+      setShowLandlordModal(false);
+      fetchPropertyDetails(false);
+    } catch (err) {
+      console.error("Failed to update landlord:", err);
+      alert("Failed to update landlord assignment");
+    } finally {
+      setAssigningLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -217,14 +223,26 @@ export default function PropertyDetail() {
       </div>
 
       <div className="row g-4">
-        {/* Landlord Information */}
-        {property.landlord && (
-          <div className="col-md-6">
-            <div className="card-light p-4 h-100">
-              <h5 className="fw-bold mb-3">
+        {/* Landlord Information (Or Unassigned Card) */}
+        <div className="col-md-6">
+          <div className="card-light p-4 h-100">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold mb-0">
                 <i className="bi bi-person-circle me-2"></i>
                 Landlord Information
               </h5>
+              {(userRole === "super_admin" || userRole === "admin" || userRole === "property_officer") && (
+                <button
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={openLandlordModal}
+                >
+                  <i className="bi bi-pencil-square me-1"></i>
+                  {property.landlord ? "Change Landlord" : "Assign Landlord"}
+                </button>
+              )}
+            </div>
+
+            {property.landlord ? (
               <div className="d-flex align-items-start">
                 <div
                   className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
@@ -252,9 +270,26 @@ export default function PropertyDetail() {
                   )}
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-3">
+                <div className="badge bg-warning text-dark mb-2 px-3 py-2 fs-6">
+                  <i className="bi bi-exclamation-circle me-1"></i> Unassigned Property
+                </div>
+                <p className="text-muted small mb-3">
+                  No landlord is currently assigned to this property.
+                </p>
+                {(userRole === "super_admin" || userRole === "admin" || userRole === "property_officer") && (
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={openLandlordModal}
+                  >
+                    <i className="bi bi-person-plus me-1"></i> Assign Landlord Now
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Property Description */}
         {property.description && (
@@ -463,6 +498,77 @@ export default function PropertyDetail() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Assign / Change Landlord Modal */}
+      {showLandlordModal && (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          tabIndex="-1"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title fw-bold">
+                  <i className="bi bi-person-fill-gear me-2"></i>
+                  {property.landlord ? "Change Property Landlord" : "Assign Landlord to Property"}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowLandlordModal(false)}
+                ></button>
+              </div>
+              <form onSubmit={handleSaveLandlord}>
+                <div className="modal-body p-4">
+                  <p className="text-muted small mb-3">
+                    Select a landlord to associate with <strong>{property.name}</strong>. You can change or remove landlord assignment at any time.
+                  </p>
+                  <div className="mb-3">
+                    <label className="form-label fw-bold">Select Landlord</label>
+                    <select
+                      className="form-select border-primary"
+                      value={selectedLandlordId}
+                      onChange={(e) => setSelectedLandlordId(e.target.value)}
+                    >
+                      <option value="">-- Unassigned (No Landlord) --</option>
+                      {landlordsList.map((ll) => (
+                        <option key={ll.id} value={ll.id}>
+                          {ll.name} {ll.company_name ? `(${ll.company_name})` : ""} [{ll.email}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="modal-footer bg-light">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowLandlordModal(false)}
+                    disabled={assigningLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary px-4 fw-bold"
+                    disabled={assigningLoading}
+                  >
+                    {assigningLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Assignment"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
     </div>

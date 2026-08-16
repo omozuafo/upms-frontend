@@ -196,26 +196,28 @@ export default function PropertyForm() {
               </div>
             </div>
 
-            {/* If Admin, show Landlord selection */}
+            {/* If Admin, show Optional Landlord selection */}
             {currentUser && currentUser.role !== "landlord" && (
               <div className="mb-4">
                 <label className="form-label fw-bold">
-                  Select Landlord
+                  Select Landlord <span className="text-muted fw-normal">(Optional - Can be assigned later)</span>
                 </label>
                 <select
                   name="landlord_id"
                   onChange={handleChange}
                   value={formData.landlord_id}
-                  className="form-select"
-                  required
+                  className="form-select border-primary"
                 >
-                  <option value="" disabled>Select a Landlord</option>
+                  <option value="">-- Unassigned (Assign Landlord Later) --</option>
                   {landlords.map(ll => (
                     <option key={ll.id} value={ll.id}>
                       {ll.name} {ll.company_name ? `(${ll.company_name})` : ''}
                     </option>
                   ))}
                 </select>
+                <small className="text-muted d-block mt-1">
+                  You can leave this unassigned now and issue/assign a landlord at any time by editing the property.
+                </small>
               </div>
             )}
 
