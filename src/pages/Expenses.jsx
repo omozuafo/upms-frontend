@@ -144,18 +144,23 @@ function ExpensesContent() {
   const fetchProperties = async () => {
     try {
       const response = await api.get("/properties?per_page=100");
-      let props = [];
-      if (Array.isArray(response.data)) {
-        props = response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        props = response.data.data;
-      } else if (response.data && response.data.properties && Array.isArray(response.data.properties)) {
-        props = response.data.properties;
-      }
+      const raw = response.data;
+      const props = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw?.properties) ? raw.properties : []));
       setProperties(props);
     } catch (error) {
-      console.error("Failed to fetch properties:", error);
-      setProperties([]);
+      console.error("Primary properties fetch failed:", error);
+      try {
+        const fallbackRes = await api.get("/properties");
+        const fbRaw = fallbackRes.data;
+        const fbProps = Array.isArray(fbRaw)
+          ? fbRaw
+          : (Array.isArray(fbRaw?.data) ? fbRaw.data : []);
+        setProperties(fbProps);
+      } catch (err2) {
+        console.error("Fallback properties fetch failed:", err2);
+      }
     }
   };
 
