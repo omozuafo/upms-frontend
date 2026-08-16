@@ -169,18 +169,42 @@ function ExpensesContent() {
       setAvailableUnits([]);
       return;
     }
+    const selectedProp = (Array.isArray(properties) ? properties : []).find(
+      (p) => String(p.id) === String(formData.property_id)
+    );
+
     api
       .get(`/properties/${formData.property_id}`)
       .then((res) => {
-        const prop = res.data?.property || res.data;
-        const units = prop?.units || [];
+        const prop = res.data?.property || res.data || selectedProp;
+        let units = prop?.units || [];
+
+        const totalCount = Number(prop?.units_count || selectedProp?.units_count || 0);
+        if ((!Array.isArray(units) || units.length === 0) && totalCount > 0) {
+          units = Array.from({ length: totalCount }, (_, i) => ({
+            id: `unit_${i + 1}`,
+            unit_number: `Unit ${i + 1}`,
+            status: "Vacant",
+          }));
+        }
+
         setAvailableUnits(Array.isArray(units) ? units : []);
       })
       .catch((err) => {
         console.error("Failed to fetch property units:", err);
-        setAvailableUnits([]);
+        const totalCount = Number(selectedProp?.units_count || 0);
+        if (totalCount > 0) {
+          const units = Array.from({ length: totalCount }, (_, i) => ({
+            id: `unit_${i + 1}`,
+            unit_number: `Unit ${i + 1}`,
+            status: "Vacant",
+          }));
+          setAvailableUnits(units);
+        } else {
+          setAvailableUnits([]);
+        }
       });
-  }, [formData.property_id]);
+  }, [formData.property_id, properties]);
 
   useEffect(() => {
     const token = sessionStorage.getItem("token");
@@ -863,8 +887,8 @@ function ExpensesContent() {
                         {availableUnits.map((u) => {
                           const tenantName = u.tenant?.name || u.tenant_name;
                           const label = tenantName
-                            ? `${u.unit_number} — Tenant: ${tenantName}`
-                            : `${u.unit_number} — Vacant (No Tenant)`;
+                            ? `${u.unit_number} (Tenant: ${tenantName})`
+                            : `${u.unit_number}`;
                           return (
                             <option key={u.id} value={u.id}>
                               {label}
