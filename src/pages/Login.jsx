@@ -46,14 +46,13 @@ export default function Login() {
       <div className="card shadow" style={{ width: "100%", maxWidth: "400px" }}>
         <div className="card-body p-4">
           <div className="text-center mb-4">
-            <div
-              className="text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow"
-              style={{ width: "64px", height: "64px", background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)" }}
-            >
-              <i className="bi bi-building fs-2"></i>
-            </div>
-            <h2 className="h3 fw-bold mb-1 text-dark">Banksomegroup</h2>
-            <p className="text-muted small">Property Management System</p>
+            <img
+              src="/favicon.png"
+              alt="Banksome Facility Management"
+              className="mb-2"
+              style={{ width: "140px", height: "auto", objectFit: "contain" }}
+            />
+            <p className="text-muted small mt-1">Property Management System</p>
           </div>
           
           {formError && (

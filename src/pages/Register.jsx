@@ -158,7 +158,16 @@ export default function Register() {
     <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light py-5">
       <div className="card shadow" style={{ width: "100%", maxWidth: "500px" }}>
         <div className="card-body p-4 p-md-5">
-          <h2 className="card-title text-center mb-4 h3 fw-bold" style={{ color: "#059669" }}>Register</h2>
+          <div className="text-center mb-4">
+            <img
+              src="/favicon.png"
+              alt="Banksome Facility Management"
+              className="mb-2"
+              style={{ width: "140px", height: "auto", objectFit: "contain" }}
+            />
+            <h2 className="card-title h4 fw-bold mb-0 text-dark">Create Account</h2>
+            <p className="text-muted small mt-1">Property Management System</p>
+          </div>
           <form onSubmit={handleSubmit} noValidate>
             <div className="mb-3">
               <label className="form-label fw-bold">Full Name</label>
