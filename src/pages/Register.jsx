@@ -18,8 +18,11 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [availableRoles, setAvailableRoles] = useState([
-    { value: "tenant", label: "Tenant" },
+    { value: "admin", label: "Admin" },
+    { value: "maintenance", label: "Maintenance" },
+    { value: "accountant", label: "Accountant" },
     { value: "landlord", label: "Landlord" },
+    { value: "tenant", label: "Tenant" },
   ]);
   const navigate = useNavigate();
 
