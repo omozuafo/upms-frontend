@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { toast } from "react-toastify";
@@ -17,7 +17,31 @@ export default function Register() {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState([
+    { value: "tenant", label: "Tenant" },
+    { value: "landlord", label: "Landlord" },
+  ]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    api.get("/auth/registration-roles")
+      .then((res) => {
+        if (isMounted && res.data?.roles) {
+          setAvailableRoles(res.data.roles);
+          if (!res.data.roles.some((r) => r.value === formData.role)) {
+            setFormData((prev) => ({
+              ...prev,
+              role: res.data.roles[0]?.value || "tenant",
+            }));
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch registration roles:", err);
+      });
+    return () => { isMounted = false; };
+  }, []);
 
   const validateField = async (name, value, currentFormData = formData) => {
     let error = "";
@@ -287,13 +311,11 @@ export default function Register() {
                 value={formData.role}
                 required
               >
-                <option value="tenant">Tenant</option>
-                <option value="landlord">Landlord</option>
-                <option value="super_admin" disabled hidden>Super Admin</option>
-                <option value="admin" disabled hidden>Admin</option>
-                <option value="property_officer" disabled hidden>Property Officer</option>
-                <option value="accounting_staff" disabled hidden>Accounting Staff</option>
-                <option value="maintenance_staff" disabled hidden>Maintenance Staff</option>
+                {availableRoles.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
               </select>
             </div>
             
